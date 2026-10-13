@@ -30,7 +30,7 @@ LANGFUSE_SECRET_KEY = os.getenv("LANGFUSE_SECRET_KEY", "")
 LANGFUSE_HOST = os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
 
 # --- Egress allowlist (fail-closed: reject any outbound host not listed) ---
-# Hosts are matched as exact strings against the netloc of outbound URLs.
+# Hosts are matched as exact strings against the hostname of outbound URLs.
 EGRESS_ALLOWLIST: set[str] = {
     "localhost",
     "127.0.0.1",
@@ -38,14 +38,18 @@ EGRESS_ALLOWLIST: set[str] = {
     "cloud.langfuse.com",                 # Langfuse (overridden by LANGFUSE_HOST)
 }
 
-# Add the configured Langfuse host dynamically
-if LANGFUSE_HOST:
-    from urllib.parse import urlparse
-    _lf_host = urlparse(LANGFUSE_HOST).netloc or LANGFUSE_HOST
-    EGRESS_ALLOWLIST.add(_lf_host)
-
 # --- Third-party mock service ---
 THIRDPARTY_BASE_URL = os.getenv("THIRDPARTY_BASE_URL", "http://localhost:8001")
+# 127.0.0.1 on the host; docker-compose sets 0.0.0.0 inside the container (published on 127.0.0.1).
+THIRDPARTY_BIND_HOST = os.getenv("THIRDPARTY_BIND_HOST", "127.0.0.1")
+
+# Allow the configured Langfuse and mock-service hosts (e.g. `langfuse-web`, `sink` under
+# docker compose). Matched by hostname, so ports don't matter.
+from urllib.parse import urlparse  # noqa: E402
+
+for _url in (LANGFUSE_HOST, THIRDPARTY_BASE_URL):
+    if _host := urlparse(_url).hostname:
+        EGRESS_ALLOWLIST.add(_host)
 
 # --- MockBank ground-truth state ---
 # One SQLite file shared by the agent, the MCP server subprocess, and the mock sink.

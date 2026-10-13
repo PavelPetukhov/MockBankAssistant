@@ -16,6 +16,26 @@ poetry install
 cp .env.example .env   # fill in GEMINI_API_KEY / Langfuse keys (needed from P2)
 ```
 
+## Running with Docker (local Langfuse included)
+
+```bash
+docker compose up -d              # Langfuse stack + mock sink (first boot takes a minute or two)
+docker compose run --rm agent     # interactive agent chat (agent arrives in P2)
+docker compose down               # stop; `down -v` also wipes traces and bank state
+```
+
+| What | Where |
+|---|---|
+| Langfuse UI | http://localhost:3000 — `admin@example.com` / `mockbank-local` |
+| Mock sink | http://localhost:8001/sink |
+
+Langfuse's org, project (`mockbank-agent`) and API keys are created automatically on first
+boot, so traces flow with no UI setup. All ports bind to `127.0.0.1` only. The headless-init
+values apply only to a fresh database: if you change them later, run `docker compose down -v`.
+
+To run the agent on the host instead, but still trace to the dockerised Langfuse, keep the
+`.env.example` defaults (`LANGFUSE_HOST=http://localhost:3000` + the `*-mockbank-local` keys).
+
 ## What works today (P1: bank + oracles)
 
 ```bash

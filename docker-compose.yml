@@ -1,0 +1,57 @@
+# MockBank lab: the target (agent + mock third-party sink) plus a local Langfuse for traces.
+#
+#   docker compose up -d               # Langfuse + sink in the background
+#   docker compose run --rm agent      # interactive agent chat (attaches to your terminal)
+#   open http://localhost:3000         # Langfuse UI (admin@example.com / mockbank-local)
+#   docker compose down                # stop; add -v to wipe Langfuse + bank state
+#
+# Everything is published on 127.0.0.1 only — this is a deliberately vulnerable target.
+
+include:
+  - docker/langfuse.yml
+
+x-mockbank: &mockbank
+  build: .
+  image: mockbank-agent:local
+  env_file:
+    - path: .env          # GEMINI_API_KEY + VULN_*/DEFENSE_* flags
+      required: false
+  volumes:
+    # Shared ground truth: the agent, MCP subprocess and sink all use one SQLite file.
+    - mockbank_state:/app/var
+
+services:
+  sink:
+    <<: *mockbank
+    command: ["python", "-m", "thirdparty.server"]
+    environment:
+      THIRDPARTY_BIND_HOST: 0.0.0.0   # inside the container; the host side is 127.0.0.1 below
+    ports:
+      - 127.0.0.1:8001:8001
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/sink')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  agent:
+    <<: *mockbank
+    profiles: ["cli"]     # not started by `up`; launch it interactively with `run`
+    command: ["python", "run.py"]
+    stdin_open: true
+    tty: true
+    depends_on:
+      sink:
+        condition: service_healthy
+      langfuse-web:
+        condition: service_started
+    environment:
+      # These override anything in .env: inside compose we always trace to the local Langfuse.
+      LANGFUSE_HOST: http://langfuse-web:3000
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_LOCAL_PUBLIC_KEY:-pk-lf-mockbank-local}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_LOCAL_SECRET_KEY:-sk-lf-mockbank-local}
+      THIRDPARTY_BASE_URL: http://sink:8001
+
+volumes:
+  mockbank_state:

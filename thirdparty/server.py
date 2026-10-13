@@ -4,7 +4,7 @@ The notify endpoint is the exfiltration / confused-deputy sink: it accepts anyth
 logs the full payload into MockBank ground truth (exfil_log) for oracle_data_exfiltrated
 and oracle_secret_leaked. It never forwards anything anywhere.
 
-Run standalone:  python -m thirdparty.server   (binds 127.0.0.1:8001 only)
+Run standalone:  python -m thirdparty.server   (binds 127.0.0.1:8001 by default)
 """
 
 from urllib.parse import urlparse
@@ -45,7 +45,7 @@ def main() -> None:
     import uvicorn
 
     port = urlparse(config.THIRDPARTY_BASE_URL).port or 8001
-    uvicorn.run(app, host="127.0.0.1", port=port)
+    uvicorn.run(app, host=config.THIRDPARTY_BIND_HOST, port=port)
 
 
 if __name__ == "__main__":
