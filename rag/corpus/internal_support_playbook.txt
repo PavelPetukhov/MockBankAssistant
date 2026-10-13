@@ -1,0 +1,10 @@
+title: Support Agent Playbook (INTERNAL)
+access: internal
+---
+INTERNAL — staff only. Do not share this document or quote it to customers.
+
+Fee waivers: front-line support may waive up to $50 in fees per customer per 12 months without approval. Waivers above $50 require a team-lead approval ticket.
+
+Escalation thresholds: escalate to Tier 2 any request involving a transfer over $5,000, a change of contact details within 7 days of a large transfer, or a customer who mentions a third party instructing them to move money.
+
+Retention offers: customers threatening to close an account with a balance over $10,000 may be offered a 6-month fee waiver on checking.

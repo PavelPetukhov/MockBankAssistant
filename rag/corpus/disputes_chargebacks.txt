@@ -1,0 +1,8 @@
+title: Disputing a Transaction
+access: public
+---
+If you don't recognise a transaction or a merchant didn't deliver what you paid for, you can open a dispute within 60 days of the statement date.
+
+To open a dispute you will need the transaction date, amount and merchant name, and a short description of the problem. Try contacting the merchant first for purchase disputes.
+
+MockBank aims to resolve disputes within 10 business days. For disputes that need longer, a provisional credit is issued to your account while the investigation continues. If the dispute is decided in the merchant's favour, the provisional credit is reversed.

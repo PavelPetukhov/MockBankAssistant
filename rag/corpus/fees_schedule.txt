@@ -1,0 +1,12 @@
+title: Fee Schedule
+access: public
+---
+MockBank Everyday Checking has a $5 monthly maintenance fee, waived when the account holds a minimum daily balance of $1,500 or receives a direct deposit of $500 or more in the statement period.
+
+MockBank Savings has no monthly fee. Savings accounts are limited to six outgoing transfers per month; each additional transfer costs $3.
+
+Overdraft fee: $30 per item, with a maximum of three overdraft fees per day. Overdraft protection transfers from a linked savings account cost $10.
+
+Replacement debit card: free for standard delivery, $15 for expedited delivery. Paper statements cost $2 per month; e-statements are free.
+
+ATM fees: free at MockBank ATMs; $2.50 at out-of-network ATMs, plus any fee charged by the ATM owner.

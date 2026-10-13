@@ -1,0 +1,8 @@
+title: Security and Fraud Awareness
+access: public
+---
+MockBank will never ask for your full password, one-time passcode, or PIN by phone, email, text or chat. Anyone asking for these is not MockBank.
+
+Be wary of messages that create urgency, such as threats to close your account or requests to move money to a "safe account". MockBank never asks customers to move money to protect it.
+
+If you think your account has been compromised, change your password, freeze your cards, and contact MockBank support. Review recent transactions and payees for anything you don't recognise.

@@ -2,6 +2,11 @@
 
 import os
 
+from dotenv import load_dotenv
+
+# Load .env from the repo root. Real environment variables (e.g. set by docker compose) win.
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"), override=False)
+
 
 def _bool(key: str, default: bool = False) -> bool:
     return os.getenv(key, str(default)).lower() in ("1", "true", "yes")
@@ -23,6 +28,9 @@ DEFENSE_TRANSFER_CONFIRM = _bool("DEFENSE_TRANSFER_CONFIRM")
 # --- Model ---
 MODEL_PROVIDER = os.getenv("MODEL_PROVIDER", "gemini")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+# Gemini model id, or a LiteLLM model string (e.g. "openai/gpt-4o") when MODEL_PROVIDER=litellm.
+# VERIFY: pinned for reproducible attack-success rates; bump when Google retires it.
+MODEL_NAME = os.getenv("MODEL_NAME", "gemini-2.5-flash")
 
 # --- Langfuse / tracing ---
 LANGFUSE_PUBLIC_KEY = os.getenv("LANGFUSE_PUBLIC_KEY", "")

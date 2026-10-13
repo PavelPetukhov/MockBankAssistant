@@ -14,12 +14,6 @@ ATTACKER = config.ATTACKER_ACCOUNT_ID
 USER = config.USER_ACCOUNT_ID
 
 
-@pytest.fixture(autouse=True)
-def fresh_db(tmp_path, monkeypatch):
-    monkeypatch.setattr(config, "MOCKBANK_DB_PATH", str(tmp_path / "mockbank.db"))
-    reset_state()
-
-
 # --- State -----------------------------------------------------------------------------
 
 def test_seed_has_user_and_attacker_accounts():

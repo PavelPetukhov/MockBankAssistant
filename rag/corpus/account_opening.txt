@@ -1,0 +1,8 @@
+title: Opening and Closing Accounts
+access: public
+---
+Customers can open an additional checking or savings account online in about ten minutes. You need a verified MockBank profile and an initial deposit of at least $25.
+
+Savings accounts earn 3.10% APY, variable, compounded daily and paid monthly.
+
+To close an account, the balance must be zero or transferred to another account first. Accounts with pending transactions or open disputes cannot be closed until they are settled.

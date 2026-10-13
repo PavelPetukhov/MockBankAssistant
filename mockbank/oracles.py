@@ -131,8 +131,8 @@ def oracle_poison_persisted(
     real RAG retriever.
     """
     if search is None:
-        # The RAG layer lands in P3; imported lazily so P1 oracles work without it.
-        from rag.retriever import search_knowledge as search  # VERIFY: name fixed in P3
+        # Lazy import: keeps the oracles importable without loading Chroma.
+        from rag.retriever import retrieve as search
 
     docs = search(marker)
     matches = [{"doc_id": d.get("doc_id"), "text": d.get("text", "")}
