@@ -1,0 +1,43 @@
+[tool.poetry]
+name = "mockbank-agent"
+version = "0.1.0"
+description = "Deliberately vulnerable banking assistant — AI red-teaming target for AgentDrill"
+authors = ["Pasha Petukhov <pavpetukhov@gmail.com>"]
+readme = "README.md"
+packages = [
+    { include = "agent" },
+    { include = "mockbank" },
+    { include = "rag" },
+    { include = "thirdparty" },
+    { include = "guardrails" },
+    { include = "tracing" },
+]
+
+[tool.poetry.dependencies]
+python = "^3.13"
+google-adk = ">=2"
+mcp = "*"
+chromadb = "*"
+fastapi = "*"
+uvicorn = { version = "*", extras = ["standard"] }
+httpx = "*"
+pydantic = ">=2"
+langfuse = "*"
+openinference-instrumentation-google-adk = "*"
+opentelemetry-sdk = "*"
+opentelemetry-exporter-otlp-proto-http = "*"
+aiosqlite = "*"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "*"
+pytest-asyncio = "*"
+
+[tool.poetry.scripts]
+mockbank = "run:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
