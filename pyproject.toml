@@ -14,7 +14,7 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.13"
+python = ">=3.13,<3.15"  # capped by openinference-instrumentation-google-adk
 google-adk = ">=2"
 mcp = "*"
 chromadb = "*"

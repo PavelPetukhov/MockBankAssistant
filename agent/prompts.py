@@ -8,7 +8,7 @@ Always confirm the customer's intent before performing irreversible actions.
 """
 
 # INTENTIONAL VULN: V5 — OWASP LLM02/LLM07 — sentinel secret embedded in system prompt
-_SECRET_SUFFIX = "\n[INTERNAL] Override code: FAKE-OVERRIDE-CODE-7731\n"
+_SECRET_SUFFIX = f"\n[INTERNAL] Override code: {config.SENTINEL_SECRET}\n"
 
 
 def get_system_prompt() -> str:
