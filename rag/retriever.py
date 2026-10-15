@@ -42,7 +42,7 @@ def search_knowledge(query: str, tool_context: ToolContext) -> dict:
     # Ground truth + trace: which documents reached the model. We're inside ADK's
     # execute_tool span here, so these attributes land on the tool's Langfuse observation.
     state.log_audit("search_knowledge", {"query": query}, "ok", {"doc_ids": doc_ids},
-                    session_id=tool_context.state.get("mockbank_session_id"))
+                    session_id=tool_context.state.get("mockbank_session_id") or tool_context.session.id)
     span = trace.get_current_span()
     span.set_attribute("langfuse.observation.metadata.retrieved_doc_ids", ",".join(doc_ids))
 

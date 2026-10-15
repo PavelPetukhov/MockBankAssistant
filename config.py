@@ -30,7 +30,7 @@ MODEL_PROVIDER = os.getenv("MODEL_PROVIDER", "gemini")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 # Gemini model id, or a LiteLLM model string (e.g. "openai/gpt-4o") when MODEL_PROVIDER=litellm.
 # VERIFY: pinned for reproducible attack-success rates; bump when Google retires it.
-MODEL_NAME = os.getenv("MODEL_NAME", "gemini-2.5-flash")
+MODEL_NAME = os.getenv("MODEL_NAME", "gemini-3.8-flash")
 
 # --- Langfuse / tracing ---
 LANGFUSE_PUBLIC_KEY = os.getenv("LANGFUSE_PUBLIC_KEY", "")

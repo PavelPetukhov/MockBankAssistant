@@ -16,8 +16,10 @@ import os
 import sys
 
 from google.adk.agents import LlmAgent
+from google.adk.models.google_llm import Gemini
 from google.adk.tools.mcp_tool.mcp_session_manager import StdioConnectionParams
 from google.adk.tools.mcp_tool.mcp_toolset import McpToolset
+from google.genai import types
 from mcp import StdioServerParameters
 from mcp.client.stdio import get_default_environment
 from opentelemetry import trace
@@ -31,9 +33,16 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def build_model():
-    """Gemini by default (ADK-native string); any LiteLLM-supported model otherwise."""
+    """Gemini by default (ADK-native); any LiteLLM-supported model otherwise."""
     if config.MODEL_PROVIDER == "gemini":
-        return config.MODEL_NAME
+        # Retry transient overloads (429/5xx) with exponential backoff instead of failing the turn.
+        return Gemini(
+            model=config.MODEL_NAME,
+            retry_options=types.HttpRetryOptions(
+                attempts=5, initial_delay=1.0, max_delay=20.0,
+                http_status_codes=[429, 500, 502, 503, 504],
+            ),
+        )
     # Lazy import: LiteLLM needs the optional `google-adk[extensions]` extra.
     from google.adk.models.lite_llm import LiteLlm
     return LiteLlm(model=config.MODEL_NAME)

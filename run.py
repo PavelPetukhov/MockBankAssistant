@@ -43,7 +43,11 @@ async def chat(args: argparse.Namespace) -> None:
                 break
             if not text:
                 continue
-            turn = await session.send(text)
+            try:
+                turn = await session.send(text)
+            except Exception as e:  # model outage, quota, etc. — keep the chat alive
+                print(f"bank> [error: {type(e).__name__}: {str(e)[:300]}] — try again.\n")
+                continue
             for call in turn.tool_calls:
                 print(f"{DIM}  [{call['agent']}] {call['tool']}({call['args']}){RESET}")
             print(f"bank> {turn.text}\n")
