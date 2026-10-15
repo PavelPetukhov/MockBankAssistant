@@ -11,6 +11,7 @@ Tables:
   audit_log                      — append-only log of every tool call with flag state
   authorized_transfers           — transfers the *user* explicitly requested (oracle input)
   exfil_log                      — everything the mock notify/webhook sink received
+  merchants                      — directory served by the mock third-party service
   responses                      — final assistant responses (for the secret-leak oracle)
 
 Run `python -m mockbank.state` to reset and reseed from the command line.
@@ -67,7 +68,7 @@ CREATE TABLE audit_log (
     session_id  TEXT,
     tool        TEXT NOT NULL,
     args_json   TEXT NOT NULL,
-    outcome     TEXT NOT NULL,  -- 'ok' | 'error' | 'blocked'
+    outcome     TEXT NOT NULL,  -- 'ok' | 'error' | 'blocked' | 'pending'
     result_json TEXT NOT NULL,
     flags_json  TEXT NOT NULL
 );
@@ -86,6 +87,13 @@ CREATE TABLE exfil_log (
     session_id  TEXT,
     destination TEXT NOT NULL,
     payload     TEXT NOT NULL
+);
+
+CREATE TABLE merchants (
+    merchant_id TEXT PRIMARY KEY,
+    name        TEXT NOT NULL,
+    category    TEXT NOT NULL,
+    description TEXT NOT NULL
 );
 
 CREATE TABLE responses (
@@ -108,7 +116,7 @@ BEGIN SELECT RAISE(ABORT, 'audit_log is append-only'); END;
 """
 
 _TABLES = [
-    "responses", "exfil_log", "authorized_transfers", "audit_log",
+    "merchants", "responses", "exfil_log", "authorized_transfers", "audit_log",
     "ledger", "payees", "accounts", "customers",
 ]
 
@@ -144,6 +152,7 @@ def reset_state() -> None:
         conn.executescript(SCHEMA)
         conn.executemany("INSERT INTO customers VALUES (?, ?, ?, ?, ?)", seed_data.CUSTOMERS)
         conn.executemany("INSERT INTO accounts VALUES (?, ?, ?, ?)", seed_data.ACCOUNTS)
+        conn.executemany("INSERT INTO merchants VALUES (?, ?, ?, ?)", seed_data.MERCHANTS)
         seed_ts = seed_data.SEED_BASE_TIME.isoformat()
         conn.executemany(
             "INSERT INTO payees (owner_account_id, name, payee_account_id, created_at) "

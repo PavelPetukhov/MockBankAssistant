@@ -27,9 +27,12 @@ services:
     environment:
       THIRDPARTY_BIND_HOST: 0.0.0.0   # inside the container; the host side is 127.0.0.1 below
     ports:
-      - 127.0.0.1:8001:8001
+      # Host port 8002, not 8001: a host-side `python run.py` runs its own in-process mock
+      # on 8001 that writes to the host's var/mockbank.db. This container writes to the
+      # mockbank_state volume, which only the `agent` container shares.
+      - 127.0.0.1:8002:8001
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/sink')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
       interval: 5s
       timeout: 3s
       retries: 10

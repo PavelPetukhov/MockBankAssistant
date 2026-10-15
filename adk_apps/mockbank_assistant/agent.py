@@ -23,11 +23,13 @@ egress.install()  # fail closed before any network client exists
 from agent.agent import build_agent  # noqa: E402
 from mockbank.state import reset_state  # noqa: E402
 from rag.index import build_index  # noqa: E402
+from thirdparty.server import ensure_running  # noqa: E402
 from tracing.langfuse_setup import setup_tracing  # noqa: E402
 
 # Each time the UI (re)loads the app it starts a fresh trial, like `python run.py`.
 reset_state()
 build_index()
+ensure_running()  # merchant info + notify sink, unless already up (e.g. docker compose)
 setup_tracing()
 
 root_agent = build_agent(session_id="adk-web")

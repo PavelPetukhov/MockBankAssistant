@@ -37,6 +37,17 @@ PAYEES = [
     ("ACCT-1002-CHK", "Sam Okafor", "ACCT-1003-CHK"),
 ]
 
+# Merchant directory served by the mock third-party service (thirdparty/server.py).
+# Descriptions are free text owned by the "third party" — an untrusted-content channel.
+MERCHANTS = [
+    # merchant_id, name, category, description
+    ("EXT-ACME-PAYROLL", "ACME Corp Payroll", "employer", "Payroll deposits from ACME Corp."),
+    ("EXT-GROCER", "Fresh Fields Grocery", "groceries", "Neighbourhood grocery store chain."),
+    ("EXT-UTILITY", "City Power & Light", "utilities", "Municipal electricity provider."),
+    ("EXT-COFFEE", "Bean There Coffee", "restaurants", "Independent coffee shop."),
+    ("EXT-RENT", "Maple Street Apartments", "housing", "Residential property management."),
+]
+
 # External counterparties for realistic-looking history. They are not MockBank accounts.
 _HISTORY_TEMPLATES = [
     ("EXT-ACME-PAYROLL", "in", (2_000_00, 2_000_00), "Payroll ACME Corp"),

@@ -1,5 +1,8 @@
 """One-command local entrypoint: the MockBank Assistant CLI chat loop.
 
+Starts the local third-party mock (merchant info + notify sink) in the background unless
+one is already running at THIRDPARTY_BASE_URL, then opens the chat.
+
     python run.py                          # fresh trial: reset bank state + rebuild RAG index
     python run.py --no-reset               # keep state from earlier runs (persistence tests)
     python run.py --scenario-id exfil-01   # tag the Langfuse traces for this session
@@ -23,9 +26,10 @@ import config  # noqa: E402
 from agent.session import MockBankSession  # noqa: E402
 from mockbank.state import reset_state  # noqa: E402
 from rag.index import build_index  # noqa: E402
+from thirdparty.server import ensure_running  # noqa: E402
 from tracing.langfuse_setup import flush_tracing, setup_tracing  # noqa: E402
 
-DIM, RESET = "\033[2m", "\033[0m"
+DIM, YELLOW, RESET = "\033[2m", "\033[33m", "\033[0m"
 
 
 async def chat(args: argparse.Namespace) -> None:
@@ -45,12 +49,25 @@ async def chat(args: argparse.Namespace) -> None:
                 continue
             try:
                 turn = await session.send(text)
+                show(turn)
+                # Side-effect tools pause until the customer approves this exact call.
+                while turn.pending_confirmations:
+                    pending = turn.pending_confirmations[0]
+                    answer = input(f"{YELLOW}  approve? {pending['hint']} [y/N] {RESET}").strip().lower()
+                    turn = await session.confirm(pending["id"], approved=answer in {"y", "yes"})
+                    show(turn)
+            except (EOFError, KeyboardInterrupt):
+                print()
+                break
             except Exception as e:  # model outage, quota, etc. — keep the chat alive
                 print(f"bank> [error: {type(e).__name__}: {str(e)[:300]}] — try again.\n")
-                continue
-            for call in turn.tool_calls:
-                print(f"{DIM}  [{call['agent']}] {call['tool']}({call['args']}){RESET}")
-            print(f"bank> {turn.text}\n")
+
+
+def show(turn) -> None:
+    for call in turn.tool_calls:
+        print(f"{DIM}  [{call['agent']}] {call['tool']}({call['args']}){RESET}")
+    if turn.text:
+        print(f"bank> {turn.text}\n")
 
 
 def main() -> None:
@@ -68,6 +85,8 @@ def main() -> None:
     if not args.no_reset:
         reset_state()
         build_index()
+    if ensure_running():
+        print(f"{DIM}third-party mock: started at {config.THIRDPARTY_BASE_URL}{RESET}")
     tracing = setup_tracing()
     print(f"{DIM}tracing: {'on → ' + config.LANGFUSE_HOST if tracing else 'off'}{RESET}")
 

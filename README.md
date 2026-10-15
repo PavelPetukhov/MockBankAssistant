@@ -27,7 +27,7 @@ docker compose down               # stop; `down -v` also wipes traces and bank s
 | What | Where |
 |---|---|
 | Langfuse UI | http://localhost:3000 — `admin@example.com` / `mockbank-local` |
-| Mock sink | http://localhost:8001/sink |
+| Mock sink (docker stack) | http://localhost:8002/sink — a host `python run.py` uses its own on :8001 |
 
 Langfuse's org, project (`mockbank-agent`) and API keys are created automatically on first
 boot, so traces flow with no UI setup. All ports bind to `127.0.0.1` only. The headless-init
@@ -36,7 +36,7 @@ values apply only to a fresh database: if you change them later, run `docker com
 To run the agent on the host instead, but still trace to the dockerised Langfuse, keep the
 `.env.example` defaults (`LANGFUSE_HOST=http://localhost:3000` + the `*-mockbank-local` keys).
 
-## Chatting with the agent (P2)
+## Chatting with the agent
 
 ```bash
 cp .env.example .env            # set GEMINI_API_KEY
@@ -45,11 +45,19 @@ poetry run python run.py        # resets bank state + RAG index, then opens the 
 ```
 
 ```
-mockbank_assistant (root)            account questions via the banking MCP server
-├─ get_my_accounts, get_balance, list_transactions, get_payees   (read-only in P2)
-└─ support_agent                     policy / fee / card / dispute questions
-   └─ search_knowledge               RAG over rag/corpus (internal docs filtered out)
+mockbank_assistant (root)
+├─ banking MCP server: get_my_accounts, get_balance, list_transactions, get_payees,
+│                      add_payee*, transfer_funds*
+├─ third-party mock:   fetch_merchant_info, notify_external (customer's own email only)
+└─ support_agent       policy / fee / card / dispute questions
+   └─ search_knowledge RAG over rag/corpus (internal docs filtered out)
+
+* paused until the customer approves — run.py asks "approve? ... [y/N]"
 ```
+
+With all flags off, money only moves after approval, only to the customer's own accounts
+or saved payees, and at most $5,000 per transfer (`TRANSFER_LIMIT_USD`). `run.py` starts the
+third-party mock on :8001 in the background.
 
 Useful flags: `--no-reset` (keep state across runs), `--scenario-id`, `--run-id`,
 `--session-id` (all tag the Langfuse traces). Programmatic use, e.g. from AgentDrill:
@@ -68,7 +76,8 @@ The corpus lives in `rag/corpus/*.txt` (header `title:` / `access: public|intern
 ```bash
 poetry run python -m mockbank.state      # reset + reseed ground truth (var/mockbank.db)
 poetry run python -m thirdparty.server   # exfil sink on 127.0.0.1:8001 (POST /notify, GET /sink)
-poetry run pytest                        # state + oracle tests
+poetry run pytest                        # offline suite (scripted model, no quota used)
+RUN_LIVE_TESTS=1 poetry run pytest       # + one live Gemini turn (spends quota)
 ```
 
 Using the oracles from a harness:

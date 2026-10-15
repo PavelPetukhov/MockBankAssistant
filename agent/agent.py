@@ -1,15 +1,16 @@
 """ADK agents: the MockBank front-desk assistant (root) and its Support sub-agent.
 
     mockbank_assistant (root LlmAgent)
-    ├─ banking tools from the local MCP server (get_my_accounts, get_balance, ...)
+    ├─ banking tools from the local MCP server: get_my_accounts, get_balance,
+    │  list_transactions, get_payees, add_payee*, transfer_funds*
+    ├─ third-party tools: fetch_merchant_info, notify_external
+    │  (* = gated by customer approval, guardrails/tool_policy.py)
     └─ sub_agents:
        └─ support_agent (LlmAgent)
           └─ search_knowledge (RAG over rag/corpus)
 
 ADK gives each agent an automatic transfer_to_agent tool, so the root can hand policy
 questions to support_agent and support_agent can hand account questions back.
-
-P3 adds transfer_funds / add_payee and the third-party tools.
 """
 
 import os
@@ -26,8 +27,10 @@ from opentelemetry import trace
 
 import config
 from agent.prompts import get_root_instruction, get_support_instruction
+from guardrails.tool_policy import enforce_tool_policy
 from mockbank import state
 from rag.retriever import search_knowledge
+from thirdparty.tools import customer_email, fetch_merchant_info, notify_external
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -78,8 +81,10 @@ def annotate_tool_span(tool, args, tool_context, tool_response):
     span = trace.get_current_span()
     active = [k for k, v in config.flag_snapshot().items() if v]
     span.set_attribute("langfuse.observation.metadata.active_flags", ",".join(active) or "none")
-    # No guarded branches exist yet; P4/P5 set this when a vuln or defense path is taken.
-    span.set_attribute("langfuse.observation.metadata.guarded_branch", "none")
+    # Set by guardrails / tools when a guarded path was taken (approval requested, rejected,
+    # destination blocked, ...). "none" means the call went through unguarded.
+    branch = tool_context.state.get(f"temp:guarded_branch:{tool_context.function_call_id}", "none")
+    span.set_attribute("langfuse.observation.metadata.guarded_branch", branch)
     return None
 
 
@@ -102,9 +107,11 @@ def build_agent(session_id: str) -> LlmAgent:
         name="mockbank_assistant",
         description="MockBank front desk: account questions, hands policy questions to support.",
         model=model,
-        instruction=get_root_instruction(customer["name"], customer["customer_id"], config.USER_ACCOUNT_ID),
-        tools=[build_banking_toolset(session_id)],
+        instruction=get_root_instruction(customer["name"], customer["customer_id"],
+                                         config.USER_ACCOUNT_ID, customer_email()),
+        tools=[build_banking_toolset(session_id), fetch_merchant_info, notify_external],
         sub_agents=[support],
+        before_tool_callback=enforce_tool_policy,
         after_tool_callback=annotate_tool_span,
     )
     return root

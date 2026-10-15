@@ -7,11 +7,19 @@ tests, and AgentDrill.
 Each send() is one Langfuse trace, tagged with the session, scenario/run ids and the
 active flags, and the final reply is recorded in MockBank ground truth (responses table)
 for oracle_secret_leaked.
+
+Side-effect tools (transfer_funds, add_payee) pause for customer approval. The paused
+calls come back in TurnResult.pending_confirmations; answer each with confirm():
+
+    turn = await s.send("Send $20 to Jordan")
+    for p in turn.pending_confirmations:      # {"id", "tool", "args", "hint"}
+        turn = await s.confirm(p["id"], approved=True)
 """
 
 import uuid
 from dataclasses import dataclass, field
 
+from google.adk.flows.llm_flows.tools._functions import REQUEST_CONFIRMATION_FUNCTION_CALL_NAME
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
@@ -28,6 +36,7 @@ class TurnResult:
     text: str
     tool_calls: list[dict] = field(default_factory=list)  # {"agent", "tool", "args"}
     agents: list[str] = field(default_factory=list)       # agents that spoke, in order
+    pending_confirmations: list[dict] = field(default_factory=list)  # {"id","tool","args","hint"}
 
 
 class MockBankSession:
@@ -69,11 +78,22 @@ class MockBankSession:
         }
 
     async def send(self, text: str) -> TurnResult:
+        """Send one customer message."""
+        return await self._run(types.Content(role="user", parts=[types.Part(text=text)]))
+
+    async def confirm(self, confirmation_id: str, approved: bool) -> TurnResult:
+        """Approve or reject a paused side-effect tool call (see pending_confirmations)."""
+        response = types.FunctionResponse(
+            id=confirmation_id, name=REQUEST_CONFIRMATION_FUNCTION_CALL_NAME,
+            response={"confirmed": approved},
+        )
+        return await self._run(types.Content(role="user", parts=[types.Part(function_response=response)]))
+
+    async def _run(self, message: types.Content) -> TurnResult:
         from langfuse import propagate_attributes
 
         result = TurnResult(text="")
         final_parts: list[str] = []
-        message = types.Content(role="user", parts=[types.Part(text=text)])
 
         # propagate_attributes is a no-op for export when tracing isn't initialised.
         with propagate_attributes(**self._trace_attributes()):
@@ -85,12 +105,22 @@ class MockBankSession:
                 ):
                     result.agents.append(event.author)
                 for call in event.get_function_calls():
-                    result.tool_calls.append(
-                        {"agent": event.author, "tool": call.name, "args": dict(call.args or {})}
-                    )
+                    if call.name == REQUEST_CONFIRMATION_FUNCTION_CALL_NAME:
+                        # VERIFY (google-adk 2.11): args = {originalFunctionCall, toolConfirmation}.
+                        original = call.args["originalFunctionCall"]
+                        result.pending_confirmations.append({
+                            "id": call.id, "tool": original["name"],
+                            "args": dict(original.get("args") or {}),
+                            "hint": call.args["toolConfirmation"].get("hint", ""),
+                        })
+                    else:
+                        result.tool_calls.append(
+                            {"agent": event.author, "tool": call.name, "args": dict(call.args or {})}
+                        )
                 if event.is_final_response() and event.content and event.content.parts:
                     final_parts += [p.text for p in event.content.parts if p.text]
 
         result.text = "\n".join(final_parts).strip()
-        state.log_response(result.text, session_id=self.session_id)
+        if result.text:
+            state.log_response(result.text, session_id=self.session_id)
         return result

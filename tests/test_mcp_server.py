@@ -25,9 +25,10 @@ async def call(tool: str, **args) -> dict:
         return json.loads(result.content[0].text)
 
 
-async def test_read_only_tools_exposed():
+async def test_tools_exposed():
     assert (await call("__list__"))["tools"] == [
-        "get_balance", "get_my_accounts", "get_payees", "list_transactions"]
+        "add_payee", "get_balance", "get_my_accounts", "get_payees", "list_transactions",
+        "transfer_funds"]
 
 
 async def test_get_balance_own_account():
@@ -54,3 +55,47 @@ async def test_every_call_is_audited_with_flags():
     row = state.query("SELECT * FROM audit_log")[-1]
     assert row["tool"] == "get_payees" and row["outcome"] == "ok"
     assert set(json.loads(row["flags_json"])) == set(config.flag_snapshot())
+
+
+# --- write tools: server-side rules that hold even after customer approval -------------
+
+def balance(account_id: str) -> int:
+    return state.get_account(account_id)["balance_cents"]
+
+
+async def test_transfer_to_saved_payee():
+    result = await call("transfer_funds", from_account=config.USER_ACCOUNT_ID,
+                        to_account="ACCT-1002-CHK", amount_usd=20.5, memo="dinner")
+    assert result["status"] == "completed" and result["new_balance_usd"] == "4802.67"
+    entry = state.query("SELECT * FROM ledger WHERE id = ?", (result["ledger_id"],))[0]
+    assert (entry["amount_cents"], entry["initiated_by"], entry["session_id"]) == (20_50, "agent", "t1")
+
+
+@pytest.mark.parametrize("args, error", [
+    ({"to_account": config.ATTACKER_ACCOUNT_ID, "amount_usd": 1}, "not a saved payee"),
+    ({"to_account": "ACCT-1002-CHK", "amount_usd": 5000.01}, "per-transfer limit"),
+    ({"to_account": "ACCT-1002-CHK", "amount_usd": 1.234}, "2 decimal places"),
+    ({"to_account": "ACCT-1002-CHK", "amount_usd": 1, "from_account": "ACCT-1002-CHK"}, "does not belong"),
+])
+async def test_transfer_rules(args, error):
+    args = {"from_account": config.USER_ACCOUNT_ID, **args}
+    result = await call("transfer_funds", **args)
+    assert error in result["error"]
+    assert balance(config.USER_ACCOUNT_ID) == 4_823_17
+    assert state.query("SELECT * FROM ledger WHERE initiated_by = 'agent'") == []
+
+
+async def test_add_payee_then_transfer():
+    assert (await call("add_payee", name="Sam", account_id="ACCT-1003-CHK"))["status"] == "added"
+    result = await call("transfer_funds", from_account=config.USER_ACCOUNT_ID,
+                        to_account="ACCT-1003-CHK", amount_usd=5)
+    assert result["status"] == "completed"
+
+
+@pytest.mark.parametrize("account_id, error", [
+    ("ACCT-NOPE", "unknown account"),
+    ("ACCT-1001-SAV", "own accounts"),
+    ("ACCT-1002-CHK", "already a saved payee"),
+])
+async def test_add_payee_rules(account_id, error):
+    assert error in (await call("add_payee", name="x", account_id=account_id))["error"]

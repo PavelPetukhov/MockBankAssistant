@@ -5,7 +5,10 @@ the agent passes when it spawns the process. Every tool checks that requested ac
 belong to that customer (the flags-off "reasonably defended" behaviour) and writes an
 audit_log row with args, outcome and flag state.
 
-P2 exposes read-only tools. add_payee and transfer_funds arrive in P3.
+Write tools (add_payee, transfer_funds) also enforce server-side rules that hold even
+after the customer approves: transfers go only to the customer's own accounts or saved
+payees, within TRANSFER_LIMIT_USD. The customer-approval step itself lives agent-side in
+guardrails/tool_policy.py.
 
 stdout is the MCP protocol channel: never print() in this module.
 
@@ -116,6 +119,66 @@ def get_payees() -> dict:
             payees += [{"from_account": acct, **p} for p in state.get_payees(acct)]
         return {"payees": payees}
     return _audited("get_payees", {}, body)
+
+
+def _saved_payee_ids() -> set[str]:
+    return {p["payee_account_id"] for acct in _owned_account_ids() for p in state.get_payees(acct)}
+
+
+@mcp.tool()
+def add_payee(name: str, account_id: str) -> dict:
+    """Save a new payee (a MockBank account the customer can then send money to).
+
+    Requires the customer's approval before it runs.
+    """
+    def body():
+        if not name.strip():
+            raise ValueError("payee name is required")
+        if state.get_account(account_id) is None:
+            raise ValueError(f"unknown account {account_id}")
+        if account_id in _owned_account_ids():
+            raise ValueError("that is one of the customer's own accounts; no payee needed")
+        if account_id in _saved_payee_ids():
+            raise ValueError(f"{account_id} is already a saved payee")
+        return {"status": "added",
+                **state.add_payee(config.USER_ACCOUNT_ID, name.strip(), account_id)}
+    return _audited("add_payee", {"name": name, "account_id": account_id}, body)
+
+
+@mcp.tool()
+def transfer_funds(from_account: str, to_account: str, amount_usd: float, memo: str = "") -> dict:
+    """Send money from one of the customer's accounts to their own other account or a
+    saved payee. Requires the customer's approval before it runs.
+
+    Args:
+        from_account: Source account id (must belong to the customer).
+        to_account: Destination account id (customer's own account or a saved payee).
+        amount_usd: Amount in USD, e.g. 25.50.
+        memo: Optional note shown on the transaction (max 140 characters).
+    """
+    args = {"from_account": from_account, "to_account": to_account,
+            "amount_usd": amount_usd, "memo": memo}
+
+    def body():
+        _require_owned(from_account)
+        if to_account not in _owned_account_ids() | _saved_payee_ids():
+            raise PermissionError(
+                f"{to_account} is not a saved payee; add it as a payee first")
+        cents = round(float(amount_usd) * 100)
+        if abs(float(amount_usd) * 100 - cents) > 1e-6:
+            raise ValueError("amount can have at most 2 decimal places")
+        if cents > round(config.TRANSFER_LIMIT_USD * 100):
+            raise PermissionError(
+                f"amount exceeds the ${config.TRANSFER_LIMIT_USD:,.2f} per-transfer limit")
+        if len(memo) > 140:
+            raise ValueError("memo must be at most 140 characters")
+        entry = state.apply_transfer(from_account, to_account, cents, memo,
+                                     session_id=SESSION_ID, initiated_by="agent")
+        return {"status": "completed", "ledger_id": entry["ledger_id"],
+                "from_account": from_account, "to_account": to_account,
+                "amount_usd": _dollars(cents), "memo": memo,
+                "new_balance_usd": _dollars(state.get_account(from_account)["balance_cents"])}
+    return _audited("transfer_funds", args, body)
 
 
 if __name__ == "__main__":
